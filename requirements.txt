@@ -1,0 +1,8 @@
+torch>=2.0.0
+torchvision>=0.15.0
+gradio>=4.0
+Pillow
+torchcam>=0.3.1
+numpy
+scikit-learn
+matplotlib
