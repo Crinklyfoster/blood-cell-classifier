@@ -1,4 +1,4 @@
-# 🧬 White Blood Cell Classifier with Grad-CAM
+# 🧬 Blood Cells Classifier with Grad-CAM
 
 This project uses a ResNet34 model trained on microscopic blood cell images to classify:
 - Eosinophil
