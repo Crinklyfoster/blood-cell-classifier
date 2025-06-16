@@ -1,54 +1,44 @@
-# ────────────────────────────────────────────────
-# 🔬 Blood Cell Classifier with ResNet34 + Grad-CAM
-# ✨ Built using PyTorch + Gradio
-# ────────────────────────────────────────────────
+# 🧪 Blood Cell Classifier with ResNet34 + Grad-CAM using Streamlit
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torchvision.transforms as transforms
 from torchvision.models import resnet34, ResNet34_Weights
 from torchvision.transforms.functional import to_pil_image
 
 from torchcam.methods import GradCAM
 from torchcam.utils import overlay_mask
-from torch.nn.functional import softmax
 
+import streamlit as st
 from PIL import Image
-import gradio as gr
+import io
 
 # ────────────────────────────────────────────────
-# 1️⃣  Setup and Configuration
+# 1️⃣  Setup
 # ────────────────────────────────────────────────
+st.set_page_config(page_title="Blood Cell Classifier", layout="centered")
 
-# Path to the trained model
-MODEL_PATH = "models/best_resnet34_final.pth"
-
-# Class names (ensure they match training order!)
 CLASSES = ['eosinophil', 'erythroblast', 'lymphocyte', 'neutrophil', 'platelet']
-
-# Use GPU if available
+MODEL_PATH = "models/best_resnet34_final.pth"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"✅ Using device: {device}")
 
 # ────────────────────────────────────────────────
-# 2️⃣  Load Pretrained ResNet34 Model
+# 2️⃣  Load Model
 # ────────────────────────────────────────────────
+@st.cache_resource
+def load_model():
+    model = resnet34(weights=ResNet34_Weights.IMAGENET1K_V1)
+    model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    return model.to(device).eval()
 
-# Load ResNet34 with ImageNet weights
-model = resnet34(weights=ResNet34_Weights.IMAGENET1K_V1)
-
-# Replace final FC layer for 5-class classification
-model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
-
-# Load saved model weights
-model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-model = model.to(device).eval()
+model = load_model()
+cam_extractor = GradCAM(model, target_layer="layer4")
 
 # ────────────────────────────────────────────────
-# 3️⃣  Define Image Preprocessing
+# 3️⃣  Image Transform
 # ────────────────────────────────────────────────
-
-# Same transform used during training
 transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
@@ -56,72 +46,35 @@ transform = transforms.Compose([
 ])
 
 # ────────────────────────────────────────────────
-# 4️⃣  Grad-CAM Setup
+# 4️⃣  Prediction Function
 # ────────────────────────────────────────────────
+def classify(image):
+    tensor = transform(image).unsqueeze(0).to(device)
+    output = model(tensor)
+    probs = F.softmax(output, dim=1)
+    pred = probs.argmax(1).item()
+    confidence = probs[0][pred].item()
+    activation = cam_extractor(pred, output)[0].cpu()
 
-# Grad-CAM extractor targeting final conv block of ResNet34
-cam_extractor = GradCAM(model, target_layer="layer4")
-
-# ────────────────────────────────────────────────
-# 5️⃣  Inference Function (image → prediction + Grad-CAM)
-# ────────────────────────────────────────────────
-
-def predict(image):
-    """
-    Runs model inference on uploaded image and returns:
-    - Predicted class name
-    - Confidence score
-    - Grad-CAM visualization
-    """
-    # Preprocess input image
-    img_tensor = transform(image).unsqueeze(0).to(device)
-
-    # Run model forward pass
-    output = model(img_tensor)
-
-    # Get class probabilities via softmax
-    prob = softmax(output, dim=1)
-
-    # Get top predicted class and confidence
-    conf_score, pred_class = torch.max(prob, 1)
-    class_name = CLASSES[pred_class.item()]
-    confidence = conf_score.item()
-
-    # Grad-CAM activation map for predicted class
-    activation_map = cam_extractor(pred_class.item(), output)[0].cpu()
-
-    # Convert input tensor back to PIL image for display
-    original_img = to_pil_image(img_tensor.squeeze().cpu() * 0.5 + 0.5)
-
-    # Overlay Grad-CAM map on image
-    cam_overlay = overlay_mask(original_img, to_pil_image(activation_map), alpha=0.5)
-
-    return class_name, f"{confidence:.4f}", cam_overlay
+    # Unnormalize for visualization
+    original = to_pil_image(tensor.squeeze().cpu() * 0.5 + 0.5)
+    cam_overlay = overlay_mask(original, to_pil_image(activation), alpha=0.5)
+    return CLASSES[pred], confidence, cam_overlay
 
 # ────────────────────────────────────────────────
-# 6️⃣  Build Gradio Interface
+# 5️⃣  Streamlit UI
 # ────────────────────────────────────────────────
+st.title("🔬 WBC Classifier with Grad-CAM")
+st.caption("Upload a blood cell image to classify it into one of 5 categories and visualize the Grad-CAM activation map.")
 
-title = "🧪 WBC Classifier with ResNet34 + Grad-CAM"
-description = "Upload a blood cell image to classify it into 5 categories and see a heatmap using Grad-CAM."
+uploaded = st.file_uploader("📤 Upload Blood Cell Image", type=["jpg", "png", "jpeg"])
 
-# Gradio UI setup
-demo = gr.Interface(
-    fn=predict,
-    inputs=gr.Image(type="pil", label="Upload Cell Image"),
-    outputs=[
-        gr.Label(num_top_classes=1, label="Predicted Class"),
-        gr.Textbox(label="Confidence Score"),
-        gr.Image(label="Grad-CAM Heatmap")
-    ],
-    title=title,
-    description=description,
-    allow_flagging="never"
-)
+if uploaded:
+    img = Image.open(uploaded).convert("RGB")
+    st.image(img, caption="📸 Uploaded Image", use_column_width=True)
 
-# ────────────────────────────────────────────────
-# 7️⃣  Launch App
-# ────────────────────────────────────────────────
+    with st.spinner("🔎 Classifying..."):
+        label, confidence, heatmap = classify(img)
 
-if __name__ == "__main__":
-    demo.launch()
+    st.success(f"🧠 **Prediction:** {label} ({confidence:.2%} confidence)")
+    st.image(heatmap, caption="🔥 Grad-CAM Heatmap", use_column_width=True)
