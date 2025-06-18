@@ -71,10 +71,10 @@ uploaded = st.file_uploader("📤 Upload Blood Cell Image", type=["jpg", "png", 
 
 if uploaded:
     img = Image.open(uploaded).convert("RGB")
-    st.image(img, caption="📸 Uploaded Image", use_column_width=True)
+    st.image(img, caption="📸 Uploaded Image", use_container_width=True)
 
     with st.spinner("🔎 Classifying..."):
         label, confidence, heatmap = classify(img)
 
     st.success(f"🧠 **Prediction:** {label} ({confidence:.2%} confidence)")
-    st.image(heatmap, caption="🔥 Grad-CAM Heatmap", use_column_width=True)
+    st.image(heatmap, caption="🔥 Grad-CAM Heatmap", use_container_width=True)
