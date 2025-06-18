@@ -34,7 +34,7 @@ It also visualizes **model attention** using Grad-CAM to enhance transparency an
 ## 🧪 Try it Live (Streamlit App)
 
 🚀 **Streamlit Live App**:  
-[🔗 Click here to launch the app](https://Crinklyfoster-blood-cell-classifier.streamlit.app)
+[🔗 Click here to launch the app](https://blood-cell-classifier-4dkswvwtf8imuyk8hef2z8.streamlit.app/)
 
 - Upload any microscope image of a blood cell.
 - Get the predicted label with confidence.
