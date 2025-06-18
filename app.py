@@ -30,7 +30,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def load_model():
     model = resnet34(weights=ResNet34_Weights.IMAGENET1K_V1)
     model.fc = nn.Linear(model.fc.in_features, len(CLASSES))
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=False))
     return model.to(device).eval()
 
 model = load_model()
